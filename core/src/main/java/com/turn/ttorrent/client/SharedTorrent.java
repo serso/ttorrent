@@ -84,6 +84,7 @@ public class SharedTorrent extends Torrent implements PeerActivityListener {
 	private long downloaded;
 	private long left;
 
+	private final File location;
 	private final TorrentByteStorage bucket;
 
 	private final int pieceLength;
@@ -183,23 +184,23 @@ public class SharedTorrent extends Torrent implements PeerActivityListener {
 	 * Create a new shared torrent from meta-info binary data.
 	 *
 	 * @param torrent The meta-info byte data.
-	 * @param parent The parent directory or location the torrent files.
+	 * @param location The parent directory or location the torrent files.
 	 * @param seeder Whether we're a seeder for this torrent or not (disables
 	 * validation).
 	 * @throws FileNotFoundException If the torrent file location or
 	 * destination directory does not exist and can't be created.
 	 * @throws IOException If the torrent file cannot be read or decoded.
 	 */
-	public SharedTorrent(byte[] torrent, File parent, boolean seeder)
+	public SharedTorrent(byte[] torrent, File location, boolean seeder)
 		throws FileNotFoundException, IOException, NoSuchAlgorithmException {
-		this(torrent, parent, seeder, DEFAULT_REQUEST_STRATEGY);
+		this(torrent, location, seeder, DEFAULT_REQUEST_STRATEGY);
 	}
 
 	/**
 	 * Create a new shared torrent from meta-info binary data.
 	 *
 	 * @param torrent The meta-info byte data.
-	 * @param parent The parent directory or location the torrent files.
+	 * @param location The parent directory or location the torrent files.
 	 * @param seeder Whether we're a seeder for this torrent or not (disables
 	 * validation).
 	 * @param requestStrategy The request strategy implementation.
@@ -207,16 +208,17 @@ public class SharedTorrent extends Torrent implements PeerActivityListener {
 	 * destination directory does not exist and can't be created.
 	 * @throws IOException If the torrent file cannot be read or decoded.
 	 */
-	public SharedTorrent(byte[] torrent, File parent, boolean seeder,
-			RequestStrategy requestStrategy)
+	public SharedTorrent(byte[] torrent, File location, boolean seeder,
+											 RequestStrategy requestStrategy)
 		throws FileNotFoundException, IOException, NoSuchAlgorithmException {
 		super(torrent, seeder);
+		this.location = location;
 
-		if (parent == null || !parent.isDirectory()) {
+		if (location == null || !location.isDirectory()) {
 			throw new IllegalArgumentException("Invalid parent directory!");
 		}
 
-		String parentPath = parent.getCanonicalPath();
+		String parentPath = location.getCanonicalPath();
 
 		try {
 			this.pieceLength = this.decoded_info.get("piece length").getInt();
@@ -236,7 +238,7 @@ public class SharedTorrent extends Torrent implements PeerActivityListener {
 		List<FileStorage> files = new LinkedList<FileStorage>();
 		long offset = 0L;
 		for (Torrent.TorrentFile file : this.files) {
-			File actual = new File(parent, file.file.getPath());
+			File actual = new File(location, file.file.getPath());
 
 			if (!actual.getCanonicalPath().startsWith(parentPath)) {
 				throw new SecurityException("Torrent file path attempted " +
@@ -874,6 +876,10 @@ public class SharedTorrent extends Torrent implements PeerActivityListener {
 				this.requestedPieces.cardinality(),
 				this.requestedPieces
 			});
+	}
+
+	public File getLocation() {
+		return location;
 	}
 
 	@Override
