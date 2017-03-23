@@ -15,8 +15,8 @@
  */
 package com.turn.ttorrent.client;
 
-import com.turn.ttorrent.common.Torrent;
 import com.turn.ttorrent.client.peer.SharingPeer;
+import com.turn.ttorrent.common.Torrent;
 import com.turn.ttorrent.common.Utils;
 
 import java.io.IOException;
@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
  * <p>
  * This ConnectionHandler implements this service and starts a listening socket
  * in the first available port in the default BitTorrent client port range
- * 6881-6889. When a peer connects to it, it expects the BitTorrent handshake
+ * 6881-6889 or in an extended range 49152-65534. When a peer connects to it, it expects the BitTorrent handshake
  * message, parses it and replies with our own handshake.
  * </p>
  *
@@ -79,8 +79,9 @@ public class ConnectionHandler implements Runnable {
 	private static final Logger logger =
 		LoggerFactory.getLogger(ConnectionHandler.class);
 
-	public static final int PORT_RANGE_START = 49152;
-	public static final int PORT_RANGE_END = 65534;
+	private static final int[] PORT_RANGES = new int[]{
+					6881, 6889,
+					49152, 65534};
 
 	private static final int OUTBOUND_CONNECTIONS_POOL_SIZE = 20;
 	private static final int OUTBOUND_CONNECTIONS_THREAD_KEEP_ALIVE_SECS = 10;
@@ -117,23 +118,24 @@ public class ConnectionHandler implements Runnable {
 		this.torrent = torrent;
 		this.id = id;
 
-		// Bind to the first available port in the range
-		// [PORT_RANGE_START; PORT_RANGE_END].
-		for (int port = ConnectionHandler.PORT_RANGE_START;
-				port <= ConnectionHandler.PORT_RANGE_END;
-				port++) {
-			InetSocketAddress tryAddress =
-				new InetSocketAddress(address, port);
+		for (int i = 0; i < PORT_RANGES.length; i += 2) {
+			final int start = PORT_RANGES[i];
+			final int end = PORT_RANGES[i + 1];
+			// Bind to the first available port in the range
+			// [PORT_RANGE_START; PORT_RANGE_END].
+			for (int port = start; port <= end; port++) {
+				InetSocketAddress tryAddress = new InetSocketAddress(address, port);
 
-			try {
-				this.channel = ServerSocketChannel.open();
-				this.channel.socket().bind(tryAddress);
-				this.channel.configureBlocking(false);
-				this.address = tryAddress;
-				break;
-			} catch (IOException ioe) {
-				// Ignore, try next port
-				logger.warn("Could not bind to {}, trying next port...", tryAddress);
+				try {
+					this.channel = ServerSocketChannel.open();
+					this.channel.socket().bind(tryAddress);
+					this.channel.configureBlocking(false);
+					this.address = tryAddress;
+					break;
+				} catch (IOException ioe) {
+					// Ignore, try next port
+					logger.warn("Could not bind to {}, trying next port...", tryAddress);
+				}
 			}
 		}
 
